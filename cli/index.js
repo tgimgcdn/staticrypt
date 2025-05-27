@@ -193,6 +193,36 @@ async function decodeAndGenerateFile(path, fullRootDirectory, hashedPassword, ou
     writeFile(outputFilepath, decoded);
 }
 
+/**
+ * Extract and encrypt marked content from HTML
+ * @param {string} htmlContent - The original HTML content
+ * @returns {Object} { encryptedContent: string, processedHtml: string }
+ */
+function processHtmlContent(htmlContent) {
+    const encryptedSections = [];
+    let sectionId = 0;
+    
+    // Replace marked content with placeholders and collect content to encrypt
+    const processedHtml = htmlContent.replace(
+        /<!--staticrypt-start-->([\s\S]*?)<!--staticrypt-end-->/g,
+        (match, content) => {
+            const id = `staticrypt-section-${sectionId++}`;
+            encryptedSections.push({ id, content: content.trim() });
+            return `<div data-staticrypt-id="${id}" class="staticrypt-placeholder">
+                <div class="staticrypt-password-prompt">
+                    <p>此内容受密码保护</p>
+                    <button onclick="staticrypt.showPasswordPrompt('${id}')">点击查看内容</button>
+                </div>
+            </div>`;
+        }
+    );
+
+    return {
+        encryptedContent: JSON.stringify(encryptedSections),
+        processedHtml
+    };
+}
+
 async function encodeAndGenerateFile(
     path,
     rootDirectoryFromArguments,
@@ -205,8 +235,20 @@ async function encodeAndGenerateFile(
     // get the file content
     const contents = getFileContent(path);
 
-    // encrypt input
-    const encryptedMsg = await encodeWithHashedPassword(contents, hashedPassword);
+    // Process HTML to extract and encrypt marked content
+    const { encryptedContent, processedHtml } = processHtmlContent(contents);
+
+    // Only encrypt if there are marked sections
+    if (encryptedContent === '[]') {
+        // If no sections to encrypt, just copy the file
+        const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
+        const outputFilepath = namedArgs.directory + "/" + relativePath;
+        writeFile(outputFilepath, contents);
+        return;
+    }
+
+    // encrypt the marked content
+    const encryptedMsg = await encodeWithHashedPassword(encryptedContent, hashedPassword);
 
     let rememberDurationInDays = parseInt(namedArgs.remember);
     rememberDurationInDays = isNaN(rememberDurationInDays) ? 0 : rememberDurationInDays;
@@ -226,7 +268,12 @@ async function encodeAndGenerateFile(
     const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
     const outputFilepath = namedArgs.directory + "/" + relativePath;
 
-    genFile(templateData, outputFilepath, namedArgs.template);
+    // Write the processed HTML with placeholders
+    writeFile(outputFilepath, processedHtml);
+
+    // Generate a separate file with the password prompt template
+    const templateFilepath = outputFilepath + '.staticrypt-template.html';
+    genFile(templateData, templateFilepath, namedArgs.template);
 }
 
 runStatiCrypt();
