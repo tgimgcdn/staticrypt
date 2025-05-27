@@ -194,7 +194,7 @@ async function decodeAndGenerateFile(path, fullRootDirectory, hashedPassword, ou
 }
 
 /**
- * Extract and encrypt marked content from HTML
+ * Process HTML content to extract and encrypt marked sections
  * @param {string} htmlContent - The original HTML content
  * @returns {Object} { encryptedContent: string, processedHtml: string }
  */
@@ -207,11 +207,19 @@ function processHtmlContent(htmlContent) {
         /<!--staticrypt-start-->([\s\S]*?)<!--staticrypt-end-->/g,
         (match, content) => {
             const id = `staticrypt-section-${sectionId++}`;
-            encryptedSections.push({ id, content: content.trim() });
-            return `<div data-staticrypt-id="${id}" class="staticrypt-placeholder">
-                <div class="staticrypt-password-prompt">
-                    <p>此内容受密码保护</p>
-                    <button onclick="staticrypt.showPasswordPrompt('${id}')">点击查看内容</button>
+            // Store the content with its ID for encryption
+            encryptedSections.push({
+                id,
+                content: content.trim()
+            });
+            
+            // Return a placeholder that will be replaced with decrypted content
+            return `<div class="staticrypt-encrypted" data-staticrypt-id="${id}">
+                <div class="staticrypt-placeholder">
+                    <div class="staticrypt-password-prompt">
+                        <p>此内容受密码保护</p>
+                        <button onclick="staticrypt.decryptSection('${id}')">点击查看内容</button>
+                    </div>
                 </div>
             </div>`;
         }
@@ -232,13 +240,13 @@ async function encodeAndGenerateFile(
     isRememberEnabled,
     namedArgs
 ) {
-    // 获取文件内容
+    // Get file content
     const contents = getFileContent(path);
 
-    // 处理 HTML 内容，提取和加密标记的内容
+    // Process HTML content to extract and encrypt marked sections
     const { encryptedContent, processedHtml } = processHtmlContent(contents);
 
-    // 如果没有标记的内容，直接复制文件
+    // If no marked content found, just copy the file
     if (encryptedContent === '[]') {
         const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
         const outputFilepath = namedArgs.directory + "/" + relativePath;
@@ -246,30 +254,32 @@ async function encodeAndGenerateFile(
         return;
     }
 
-    // 加密标记的内容
+    // Encrypt the marked content
     const encryptedMsg = await encodeWithHashedPassword(encryptedContent, hashedPassword);
 
     let rememberDurationInDays = parseInt(namedArgs.remember);
     rememberDurationInDays = isNaN(rememberDurationInDays) ? 0 : rememberDurationInDays;
 
-    // 将加密内容和配置注入到原始 HTML 中，保持原始 HTML 结构不变
+    // Inject encryption config and scripts into the HTML
     const injectedHtml = processedHtml.replace('</head>', `
         <script>
             window.staticryptConfig = {
-                staticryptEncryptedMsgUniqueVariableName: "${encryptedMsg}",
+                encryptedContent: "${encryptedMsg}",
+                salt: "${salt}",
                 isRememberEnabled: ${isRememberEnabled},
-                rememberDurationInDays: ${rememberDurationInDays},
-                staticryptSaltUniqueVariableName: "${salt}"
+                rememberDurationInDays: ${rememberDurationInDays}
             };
         </script>
         <script src="staticrypt.js"></script>
         <style>
+            .staticrypt-encrypted {
+                margin: 1em 0;
+            }
             .staticrypt-placeholder {
                 background: #f5f5f5;
                 border: 1px solid #ddd;
                 border-radius: 4px;
                 padding: 20px;
-                margin: 20px 0;
                 text-align: center;
             }
             .staticrypt-password-prompt {
@@ -319,14 +329,11 @@ async function encodeAndGenerateFile(
                 color: #666;
             }
             .staticrypt-form {
-                position: relative;
-                z-index: 1;
-                background: #ffffff;
                 padding: 20px;
-                text-align: center;
             }
             .staticrypt-instructions {
                 margin-bottom: 20px;
+                text-align: center;
             }
             .staticrypt-title {
                 font-size: 1.5em;
@@ -368,7 +375,7 @@ async function encodeAndGenerateFile(
         </style>
     </head>`);
 
-    // 添加密码提示模态框
+    // Add password modal
     const modalHtml = `
         <div id="staticrypt-modal" class="staticrypt-modal">
             <div class="staticrypt-modal-content">
@@ -401,7 +408,7 @@ async function encodeAndGenerateFile(
 
     const finalHtml = injectedHtml.replace('</body>', `${modalHtml}</body>`);
 
-    // 写入处理后的文件
+    // Write the processed file
     const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
     const outputFilepath = namedArgs.directory + "/" + relativePath;
     writeFile(outputFilepath, finalHtml);
