@@ -253,27 +253,25 @@ async function encodeAndGenerateFile(
     let rememberDurationInDays = parseInt(namedArgs.remember);
     rememberDurationInDays = isNaN(rememberDurationInDays) ? 0 : rememberDurationInDays;
 
-    const staticryptConfig = {
-        staticryptEncryptedMsgUniqueVariableName: encryptedMsg,
-        isRememberEnabled,
-        rememberDurationInDays,
-        staticryptSaltUniqueVariableName: salt,
-    };
-    const templateData = {
-        ...baseTemplateData,
-        staticrypt_config: staticryptConfig,
-    };
+    // 将加密内容和配置注入到HTML中
+    const injectedHtml = processedHtml.replace('</head>', `
+        <script>
+            window.staticryptConfig = {
+                staticryptEncryptedMsgUniqueVariableName: "${encryptedMsg}",
+                isRememberEnabled: ${isRememberEnabled},
+                rememberDurationInDays: ${rememberDurationInDays},
+                staticryptSaltUniqueVariableName: "${salt}"
+            };
+        </script>
+        <script src="staticrypt.js"></script>
+    </head>`);
 
     // remove the base path so that the actual output path is relative to the base path
     const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
     const outputFilepath = namedArgs.directory + "/" + relativePath;
 
-    // Write the processed HTML with placeholders
-    writeFile(outputFilepath, processedHtml);
-
-    // Generate a separate file with the password prompt template
-    const templateFilepath = outputFilepath + '.staticrypt-template.html';
-    genFile(templateData, templateFilepath, namedArgs.template);
+    // Write the processed HTML with placeholders and injected scripts
+    writeFile(outputFilepath, injectedHtml);
 }
 
 runStatiCrypt();
