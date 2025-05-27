@@ -253,7 +253,7 @@ async function encodeAndGenerateFile(
     let rememberDurationInDays = parseInt(namedArgs.remember);
     rememberDurationInDays = isNaN(rememberDurationInDays) ? 0 : rememberDurationInDays;
 
-    // 将加密内容和配置注入到HTML中
+    // 将加密内容和配置注入到HTML中，但保持其他内容不变
     const injectedHtml = processedHtml.replace('</head>', `
         <script>
             window.staticryptConfig = {
