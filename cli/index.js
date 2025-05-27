@@ -232,28 +232,27 @@ async function encodeAndGenerateFile(
     isRememberEnabled,
     namedArgs
 ) {
-    // get the file content
+    // 获取文件内容
     const contents = getFileContent(path);
 
-    // Process HTML to extract and encrypt marked content
+    // 处理 HTML 内容，提取和加密标记的内容
     const { encryptedContent, processedHtml } = processHtmlContent(contents);
 
-    // Only encrypt if there are marked sections
+    // 如果没有标记的内容，直接复制文件
     if (encryptedContent === '[]') {
-        // If no sections to encrypt, just copy the file
         const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
         const outputFilepath = namedArgs.directory + "/" + relativePath;
         writeFile(outputFilepath, contents);
         return;
     }
 
-    // encrypt the marked content
+    // 加密标记的内容
     const encryptedMsg = await encodeWithHashedPassword(encryptedContent, hashedPassword);
 
     let rememberDurationInDays = parseInt(namedArgs.remember);
     rememberDurationInDays = isNaN(rememberDurationInDays) ? 0 : rememberDurationInDays;
 
-    // 将加密内容和配置注入到HTML中，但保持其他内容不变
+    // 将加密内容和配置注入到原始 HTML 中
     const injectedHtml = processedHtml.replace('</head>', `
         <script>
             window.staticryptConfig = {
@@ -264,14 +263,91 @@ async function encodeAndGenerateFile(
             };
         </script>
         <script src="staticrypt.js"></script>
+        <style>
+            .staticrypt-placeholder {
+                background: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 20px;
+                margin: 20px 0;
+                text-align: center;
+            }
+            .staticrypt-password-prompt {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            .staticrypt-password-prompt button {
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            .staticrypt-modal {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1000;
+            }
+            .staticrypt-modal-content {
+                position: relative;
+                background: white;
+                margin: 15% auto;
+                padding: 20px;
+                width: 80%;
+                max-width: 500px;
+                border-radius: 4px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+        </style>
     </head>`);
 
-    // remove the base path so that the actual output path is relative to the base path
+    // 添加密码提示模态框
+    const modalHtml = `
+        <div id="staticrypt-modal" class="staticrypt-modal">
+            <div class="staticrypt-modal-content">
+                <span class="staticrypt-modal-close">&times;</span>
+                <div class="staticrypt-form">
+                    <div class="staticrypt-instructions">
+                        <p class="staticrypt-title">密码保护</p>
+                        <p>请输入密码以查看受保护的内容</p>
+                    </div>
+                    <hr class="staticrypt-hr" />
+                    <form id="staticrypt-modal-form" action="#" method="post">
+                        <div class="staticrypt-password-container">
+                            <input
+                                id="staticrypt-modal-password"
+                                type="password"
+                                name="password"
+                                placeholder="请输入密码"
+                                autofocus
+                            />
+                        </div>
+                        <label class="staticrypt-remember">
+                            <input id="staticrypt-modal-remember" type="checkbox" name="remember" />
+                            记住密码
+                        </label>
+                        <input type="submit" class="staticrypt-decrypt-button" value="解密" />
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const finalHtml = injectedHtml.replace('</body>', `${modalHtml}</body>`);
+
+    // 写入处理后的文件
     const relativePath = pathModule.relative(rootDirectoryFromArguments, path);
     const outputFilepath = namedArgs.directory + "/" + relativePath;
-
-    // Write the processed HTML with placeholders and injected scripts
-    writeFile(outputFilepath, injectedHtml);
+    writeFile(outputFilepath, finalHtml);
 }
 
 runStatiCrypt();
