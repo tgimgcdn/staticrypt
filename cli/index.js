@@ -252,7 +252,7 @@ async function encodeAndGenerateFile(
     let rememberDurationInDays = parseInt(namedArgs.remember);
     rememberDurationInDays = isNaN(rememberDurationInDays) ? 0 : rememberDurationInDays;
 
-    // 将加密内容和配置注入到原始 HTML 中
+    // 将加密内容和配置注入到原始 HTML 中，保持原始 HTML 结构不变
     const injectedHtml = processedHtml.replace('</head>', `
         <script>
             window.staticryptConfig = {
@@ -287,6 +287,9 @@ async function encodeAndGenerateFile(
                 cursor: pointer;
                 font-size: 14px;
             }
+            .staticrypt-password-prompt button:hover {
+                filter: brightness(92%);
+            }
             .staticrypt-modal {
                 display: none;
                 position: fixed;
@@ -307,6 +310,61 @@ async function encodeAndGenerateFile(
                 border-radius: 4px;
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             }
+            .staticrypt-modal-close {
+                position: absolute;
+                right: 10px;
+                top: 10px;
+                font-size: 20px;
+                cursor: pointer;
+                color: #666;
+            }
+            .staticrypt-form {
+                position: relative;
+                z-index: 1;
+                background: #ffffff;
+                padding: 20px;
+                text-align: center;
+            }
+            .staticrypt-instructions {
+                margin-bottom: 20px;
+            }
+            .staticrypt-title {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+            }
+            .staticrypt-password-container {
+                position: relative;
+                margin-bottom: 15px;
+            }
+            .staticrypt-password-container input {
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+            .staticrypt-remember {
+                display: flex;
+                align-items: center;
+                margin-bottom: 15px;
+                justify-content: center;
+            }
+            .staticrypt-remember input {
+                margin-right: 8px;
+            }
+            .staticrypt-decrypt-button {
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                width: 100%;
+            }
+            .staticrypt-decrypt-button:hover {
+                filter: brightness(92%);
+            }
         </style>
     </head>`);
 
@@ -320,7 +378,6 @@ async function encodeAndGenerateFile(
                         <p class="staticrypt-title">密码保护</p>
                         <p>请输入密码以查看受保护的内容</p>
                     </div>
-                    <hr class="staticrypt-hr" />
                     <form id="staticrypt-modal-form" action="#" method="post">
                         <div class="staticrypt-password-container">
                             <input
