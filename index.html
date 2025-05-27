@@ -76,6 +76,11 @@
                         your browser (client side).
                     </p>
                     <p>
+                        You can encrypt the entire page or just specific sections by wrapping them with 
+                        <code>&lt;!--staticrypt-start--&gt;</code> and <code>&lt;!--staticrypt-end--&gt;</code> markers.
+                        Only the content between these markers will be encrypted.
+                    </p>
+                    <p>
                         Download your encrypted string in a HTML page with a password prompt you can upload anywhere
                         (see <a target="_blank" href="example/encrypted/example.html">example</a>).
                     </p>
@@ -151,9 +156,13 @@
                             <textarea
                                 class="form-control"
                                 id="unencrypted_html"
-                                placeholder="<html><head>..."
+                                placeholder="<html><head>...&#10;&#10;<!--staticrypt-start-->&#10;This content will be encrypted&#10;<!--staticrypt-end-->"
                                 rows="5"
                             ></textarea>
+                            <small class="form-text text-muted">
+                                Wrap content you want to encrypt with &lt;!--staticrypt-start--&gt; and &lt;!--staticrypt-end--&gt; markers.
+                                Content outside these markers will remain visible without password.
+                            </small>
                         </div>
 
                         <div class="form-group">
@@ -1369,6 +1378,14 @@ exports.init = init;
 
                 const unencrypted = document.getElementById("unencrypted_html").value,
                     password = document.getElementById("password").value;
+
+                // Check if the content has encryption markers
+                const startMarker = '<!--staticrypt-start-->';
+                const endMarker = '<!--staticrypt-end-->';
+                const hasMarkers = unencrypted.includes(startMarker) && unencrypted.includes(endMarker);
+                if (!hasMarkers) {
+                    alert("Warning: No encryption markers found. The entire page will be encrypted. To encrypt only specific sections, wrap them with &lt;!--staticrypt-start--&gt; and &lt;!--staticrypt-end--&gt; markers.");
+                }
 
                 const salt = cryptoEngine.generateRandomSalt();
                 const encryptedMsg = await encode(unencrypted, password, salt);
